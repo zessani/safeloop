@@ -47,6 +47,20 @@ type Report struct {
 	RiskScore     float64
 	RiskLevel     RiskLevel
 	WeatherData   WeatherInfo
+	MatchedAlerts []EpiCoreAlert
+	AgeBracket    string
+	Occupation    string
+}
+
+type EpiCoreAlert struct {
+	AlertID          string
+	Disease          string
+	Region           string
+	Country          string
+	TransmissionType string // "animal_origin", "vector_borne", "person_to_person", "environmental"
+	Severity         string // "LOW", "MEDIUM", "HIGH"
+	Symptoms         []string
+	ReportedAt       time.Time
 }
 
 type ClusterAlert struct {

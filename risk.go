@@ -13,10 +13,15 @@ type pathogenResult struct {
 	alerts []PathogenAlert
 }
 
-func ComputeRisk(symptoms []string, zip string, travel, animal bool, wc *WeatherCache, store *ReportStore) (RiskLevel, float64, WeatherInfo) {
+type epiCoreResult struct {
+	alerts []EpiCoreAlert
+}
+
+func ComputeRisk(symptoms []string, zip string, travel, animal bool, wc *WeatherCache, store *ReportStore) (RiskLevel, float64, WeatherInfo, []EpiCoreAlert) {
 	wCh := make(chan weatherResult, 1)
 	cCh := make(chan cdcResult, 1)
 	pCh := make(chan pathogenResult, 1)
+	eCh := make(chan epiCoreResult, 1)
 
 	go func() {
 		w, e := fetchWeather(zip, wc)
@@ -28,10 +33,14 @@ func ComputeRisk(symptoms []string, zip string, travel, animal bool, wc *Weather
 	go func() {
 		pCh <- pathogenResult{fetchPathogenAlerts()}
 	}()
+	go func() {
+		eCh <- epiCoreResult{fetchEpiCoreAlerts()}
+	}()
 
 	wRes := <-wCh
 	cRes := <-cCh
 	pRes := <-pCh
+	eRes := <-eCh
 
 	score := 0.0
 	score += scoreSymptoms(symptoms)
@@ -55,7 +64,32 @@ func ComputeRisk(symptoms []string, zip string, travel, animal bool, wc *Weather
 		score = 1.0
 	}
 
-	return levelFromScore(score), score, wRes.info
+	matched := matchEpiCoreAlerts(eRes.alerts, symptoms, travel)
+
+	level := levelFromScore(score)
+
+	for _, alert := range matched {
+		if alert.Severity == "HIGH" {
+			level = RiskHigh
+			break
+		}
+	}
+
+	return level, score, wRes.info, matched
+}
+
+func matchEpiCoreAlerts(alerts []EpiCoreAlert, symptoms []string, traveled bool) []EpiCoreAlert {
+	var matched []EpiCoreAlert
+	for _, alert := range alerts {
+		if alert.Country != "US" && !traveled {
+			continue
+		}
+		overlap := symptomOverlap(symptoms, alert.Symptoms)
+		if overlap >= 2 {
+			matched = append(matched, alert)
+		}
+	}
+	return matched
 }
 
 func scoreSymptoms(symptoms []string) float64 {

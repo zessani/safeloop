@@ -110,6 +110,72 @@ func fetchCDCActivity(zip string) CDCActivity {
 	}
 }
 
+func fetchEpiCoreAlerts() []EpiCoreAlert {
+	now := time.Now()
+	return []EpiCoreAlert{
+		{
+			AlertID: "EPI-001", Disease: "H5N1 avian influenza", Region: "Cambodia", Country: "Cambodia",
+			TransmissionType: "animal_origin", Severity: "HIGH",
+			Symptoms: []string{"fever", "cough", "difficulty_breathing", "fatigue"}, ReportedAt: now.AddDate(0, 0, -3),
+		},
+		{
+			AlertID: "EPI-002", Disease: "H5N1 avian influenza", Region: "Vietnam", Country: "Vietnam",
+			TransmissionType: "animal_origin", Severity: "HIGH",
+			Symptoms: []string{"fever", "cough", "difficulty_breathing"}, ReportedAt: now.AddDate(0, 0, -5),
+		},
+		{
+			AlertID: "EPI-003", Disease: "Dengue fever", Region: "Brazil", Country: "Brazil",
+			TransmissionType: "vector_borne", Severity: "MEDIUM",
+			Symptoms: []string{"fever", "headache", "fatigue", "nausea"}, ReportedAt: now.AddDate(0, 0, -7),
+		},
+		{
+			AlertID: "EPI-004", Disease: "Dengue fever", Region: "Mexico", Country: "Mexico",
+			TransmissionType: "vector_borne", Severity: "MEDIUM",
+			Symptoms: []string{"fever", "headache", "nausea"}, ReportedAt: now.AddDate(0, 0, -10),
+		},
+		{
+			AlertID: "EPI-005", Disease: "Cholera", Region: "East Africa", Country: "Kenya",
+			TransmissionType: "environmental", Severity: "HIGH",
+			Symptoms: []string{"nausea", "fatigue"}, ReportedAt: now.AddDate(0, 0, -4),
+		},
+		{
+			AlertID: "EPI-006", Disease: "Measles", Region: "Europe", Country: "France",
+			TransmissionType: "person_to_person", Severity: "MEDIUM",
+			Symptoms: []string{"fever", "cough", "fatigue"}, ReportedAt: now.AddDate(0, 0, -12),
+		},
+		{
+			AlertID: "EPI-007", Disease: "Mpox", Region: "Central Africa", Country: "DRC",
+			TransmissionType: "animal_origin", Severity: "MEDIUM",
+			Symptoms: []string{"fever", "fatigue", "headache"}, ReportedAt: now.AddDate(0, 0, -8),
+		},
+		{
+			AlertID: "EPI-008", Disease: "Marburg virus", Region: "Rwanda", Country: "Rwanda",
+			TransmissionType: "animal_origin", Severity: "HIGH",
+			Symptoms: []string{"fever", "fatigue", "nausea", "difficulty_breathing"}, ReportedAt: now.AddDate(0, 0, -2),
+		},
+		{
+			AlertID: "EPI-009", Disease: "West Nile virus", Region: "Maricopa County AZ", Country: "US",
+			TransmissionType: "vector_borne", Severity: "MEDIUM",
+			Symptoms: []string{"fever", "headache", "fatigue"}, ReportedAt: now.AddDate(0, 0, -6),
+		},
+		{
+			AlertID: "EPI-010", Disease: "Avian flu in dairy cattle", Region: "Texas", Country: "US",
+			TransmissionType: "animal_origin", Severity: "HIGH",
+			Symptoms: []string{"fever", "cough", "fatigue"}, ReportedAt: now.AddDate(0, 0, -9),
+		},
+		{
+			AlertID: "EPI-011", Disease: "Avian flu in dairy cattle", Region: "Colorado", Country: "US",
+			TransmissionType: "animal_origin", Severity: "HIGH",
+			Symptoms: []string{"fever", "cough"}, ReportedAt: now.AddDate(0, 0, -11),
+		},
+		{
+			AlertID: "EPI-012", Disease: "Valley Fever", Region: "Pima County AZ", Country: "US",
+			TransmissionType: "environmental", Severity: "MEDIUM",
+			Symptoms: []string{"cough", "fatigue", "difficulty_breathing"}, ReportedAt: now.AddDate(0, 0, -15),
+		},
+	}
+}
+
 func fetchPathogenAlerts() []PathogenAlert {
 	return []PathogenAlert{
 		{

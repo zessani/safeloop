@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+var ageBrackets = []string{"under_18", "18_39", "40_64", "65_plus"}
+var ageBracketLabels = []string{"Under 18", "18-39", "40-64", "65+"}
+
+var occupations = []string{"student", "healthcare", "agriculture", "veterinary", "office", "service", "retired", "other"}
+var occupationLabels = []string{"Student", "Healthcare worker", "Agriculture/farming", "Veterinary", "Office/remote", "Service industry", "Retired", "Other"}
+
 var symptomList = []string{
 	"fever",
 	"cough",
@@ -55,17 +61,27 @@ func handleClient(conn net.Conn, store *ReportStore, wc *WeatherCache) {
 			return
 		}
 
+		ageBracket, err := promptAge(rw)
+		if err != nil {
+			return
+		}
+
+		occupation, err := promptOccupation(rw)
+		if err != nil {
+			return
+		}
+
 		zip, err := promptZip(rw)
 		if err != nil {
 			return
 		}
 
-		travel, err := promptYesNo(rw, "Recent travel outside Arizona? (y/n): ")
+		travel, err := promptYesNo(rw, "[5] Recent travel outside Arizona? (y/n): ")
 		if err != nil {
 			return
 		}
 
-		animal, err := promptYesNo(rw, "Recent animal contact? (y/n): ")
+		animal, err := promptYesNo(rw, "[6] Recent animal contact? (y/n): ")
 		if err != nil {
 			return
 		}
@@ -74,7 +90,7 @@ func handleClient(conn net.Conn, store *ReportStore, wc *WeatherCache) {
 		writeLine(rw, "Computing risk assessment...")
 		writeLine(rw, "")
 
-		level, score, weather := ComputeRisk(symptoms, zip, travel, animal, wc, store)
+		level, score, weather, matched := ComputeRisk(symptoms, zip, travel, animal, wc, store)
 
 		id := generateID()
 		report := Report{
@@ -87,6 +103,9 @@ func handleClient(conn net.Conn, store *ReportStore, wc *WeatherCache) {
 			RiskScore:     score,
 			RiskLevel:     level,
 			WeatherData:   weather,
+			MatchedAlerts: matched,
+			AgeBracket:    ageBracket,
+			Occupation:    occupation,
 		}
 		store.AddReport(report)
 
@@ -94,6 +113,13 @@ func handleClient(conn net.Conn, store *ReportStore, wc *WeatherCache) {
 		writeLine(rw, fmt.Sprintf("  RISK LEVEL:  %s (score: %.2f)", level, score))
 		writeLine(rw, fmt.Sprintf("  Report ID:   %s", id))
 		writeLine(rw, fmt.Sprintf("  Weather:     %.1f°C, %d%% humidity, %s", weather.Temp, weather.Humidity, weather.Description))
+		if len(matched) > 0 {
+			writeLine(rw, "")
+			writeLine(rw, "  EpiCore Matches:")
+			for _, a := range matched {
+				writeLine(rw, fmt.Sprintf("    ! %s (%s) — %s severity", a.Disease, a.Region, a.Severity))
+			}
+		}
 		writeLine(rw, "==================================")
 		writeLine(rw, "Thank you. Your report has been recorded.")
 		writeLine(rw, "")
@@ -118,7 +144,7 @@ func handleClient(conn net.Conn, store *ReportStore, wc *WeatherCache) {
 
 func promptSymptoms(rw *bufio.ReadWriter) ([]string, error) {
 	for {
-		writeLine(rw, "[1] Select symptoms (comma-separated numbers):")
+		writeLine(rw, "[1] Select your symptoms (comma-separated numbers):")
 		for i, s := range symptomList {
 			writeLine(rw, fmt.Sprintf("  %d. %s", i+1, formatSymptom(s)))
 		}
@@ -150,10 +176,56 @@ func promptSymptoms(rw *bufio.ReadWriter) ([]string, error) {
 	}
 }
 
+func promptAge(rw *bufio.ReadWriter) (string, error) {
+	for {
+		writeLine(rw, "")
+		writeLine(rw, "[2] Select your age bracket:")
+		for i, label := range ageBracketLabels {
+			writeLine(rw, fmt.Sprintf("  %d. %s", i+1, label))
+		}
+		write(rw, "> ")
+
+		input, err := rw.ReadString('\n')
+		if err != nil {
+			return "", err
+		}
+
+		idx := 0
+		fmt.Sscanf(strings.TrimSpace(input), "%d", &idx)
+		if idx >= 1 && idx <= len(ageBrackets) {
+			return ageBrackets[idx-1], nil
+		}
+		writeLine(rw, "Invalid input. Please enter a number (1-4).")
+	}
+}
+
+func promptOccupation(rw *bufio.ReadWriter) (string, error) {
+	for {
+		writeLine(rw, "")
+		writeLine(rw, "[3] Select your occupation:")
+		for i, label := range occupationLabels {
+			writeLine(rw, fmt.Sprintf("  %d. %s", i+1, label))
+		}
+		write(rw, "> ")
+
+		input, err := rw.ReadString('\n')
+		if err != nil {
+			return "", err
+		}
+
+		idx := 0
+		fmt.Sscanf(strings.TrimSpace(input), "%d", &idx)
+		if idx >= 1 && idx <= len(occupations) {
+			return occupations[idx-1], nil
+		}
+		writeLine(rw, "Invalid input. Please enter a number (1-8).")
+	}
+}
+
 func promptZip(rw *bufio.ReadWriter) (string, error) {
 	for {
 		writeLine(rw, "")
-		writeLine(rw, "[2] Enter your 5-digit ZIP code (AZ only):")
+		writeLine(rw, "[4] Enter your 5-digit ZIP code (AZ only):")
 		write(rw, "> ")
 
 		input, err := rw.ReadString('\n')
