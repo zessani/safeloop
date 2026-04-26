@@ -284,6 +284,53 @@ func generateNarrative(profile RiskProfile, weather WeatherInfo, matched []EpiCo
 	return narrativeFallback(profile, zip)
 }
 
+func generateBriefingSummary(statsJSON string, fallback string) string {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return fallback
+	}
+
+	prompt := "You are writing a daily briefing for an Arizona public health officer. Based on this surveillance data, write 3-4 sentences in plain prose highlighting key trends, areas of concern, and notable patterns. Focus on actionable insight, not raw numbers. No markdown, no bullet points, no asterisks.\n\nData: " + statsJSON
+
+	reqBody := geminiRequest{
+		Contents: []geminiContent{
+			{Parts: []geminiPart{{Text: prompt}}},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return fallback
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s", apiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return fallback
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fallback
+	}
+	defer resp.Body.Close()
+
+	var gemResp geminiResponse
+	if err := json.NewDecoder(resp.Body).Decode(&gemResp); err != nil {
+		return fallback
+	}
+
+	if len(gemResp.Candidates) > 0 && len(gemResp.Candidates[0].Content.Parts) > 0 {
+		return gemResp.Candidates[0].Content.Parts[0].Text
+	}
+
+	return fallback
+}
+
 func narrativeFallback(profile RiskProfile, zip string) string {
 	primary := profile.Human
 	if profile.Animal.Score > primary.Score {

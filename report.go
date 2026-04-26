@@ -137,6 +137,20 @@ func (cs *ClusterStore) GetAll() []*ClusterAlert {
 	return result
 }
 
+func (cs *ClusterStore) Update(zip string, count int, symptoms []string, dominant []string, alerts []EpiCoreAlert) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	for _, c := range cs.clusters {
+		if c.ZipCode == zip && (c.Status == "pending" || c.Status == "verified") {
+			c.Count = count
+			c.Symptoms = symptoms
+			c.DominantSymptoms = dominant
+			c.MatchedAlerts = alerts
+			return
+		}
+	}
+}
+
 func (cs *ClusterStore) Exists(zip string) bool {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -148,6 +162,12 @@ func (cs *ClusterStore) Exists(zip string) bool {
 	return false
 }
 
+func (cs *ClusterStore) Clear() {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.clusters = make(map[string]*ClusterAlert)
+}
+
 func NewReportStore() *ReportStore {
 	return &ReportStore{
 		reports: make([]Report, 0),
@@ -157,8 +177,15 @@ func NewReportStore() *ReportStore {
 
 func (s *ReportStore) AddReport(r Report) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.reports = append(s.reports, r)
+	s.mu.Unlock()
+	SaveReports("./data/reports.json", s)
+}
+
+func (s *ReportStore) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reports = make([]Report, 0)
 }
 
 func (s *ReportStore) GetReportsByZip(zip string, window time.Duration) []Report {
@@ -172,6 +199,23 @@ func (s *ReportStore) GetReportsByZip(zip string, window time.Duration) []Report
 			results = append(results, r)
 		}
 	}
+	return results
+}
+
+func (s *ReportStore) GetReportsForCluster(zip string, detectedAt time.Time) []Report {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cutoff := detectedAt.Add(-24 * time.Hour)
+	var results []Report
+	for _, r := range s.reports {
+		if r.ZipCode == zip && r.Timestamp.After(cutoff) && !r.Timestamp.After(detectedAt.Add(time.Minute)) {
+			results = append(results, r)
+		}
+	}
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Timestamp.Before(results[j].Timestamp)
+	})
 	return results
 }
 

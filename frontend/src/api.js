@@ -29,6 +29,16 @@ export async function verifyCluster(id, notes) {
   return res.json()
 }
 
+export async function fetchBriefing() {
+  const res = await fetch('/api/officer/briefing')
+  return res.json()
+}
+
+export async function fetchClusterReports(id) {
+  const res = await fetch(`/api/clusters/${id}/reports`)
+  return res.json()
+}
+
 export async function dismissCluster(id, notes) {
   const res = await fetch(`/api/clusters/${id}/dismiss`, {
     method: 'POST',
