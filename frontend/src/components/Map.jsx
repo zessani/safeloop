@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { MapContainer, TileLayer, CircleMarker, Marker, Popup, GeoJSON, Tooltip } from 'react-leaflet'
+import { MapContainer, TileLayer, Circle, CircleMarker, Marker, Popup, GeoJSON, Tooltip, Polyline } from 'react-leaflet'
 import L from 'leaflet'
 import { useLanguage } from '../i18n/LanguageContext'
 import { COUNTY_POPULATION, ZIP_TO_COUNTY, GEOJSON_URL } from '../data/arizonaCounties'
@@ -159,6 +159,7 @@ function MapControls({ timeRange, setTimeRange, filters, setFilters, hidden }) {
     { key: 'reports', label: t('filter_reports') },
     { key: 'pending', label: t('filter_pending') },
     { key: 'verified', label: t('filter_verified') },
+    { key: 'trajectory', label: t('filter_trajectory') },
   ]
 
   return (
@@ -277,11 +278,11 @@ function MapFooter({ reports }) {
   )
 }
 
-export default function MapView({ reports = [], clusters = [], timeRange, setTimeRange }) {
+export default function MapView({ reports = [], clusters = [], trajectories = {}, timeRange, setTimeRange }) {
   const { t } = useLanguage()
   const [countyGeoJSON, setCountyGeoJSON] = useState(null)
   const [selectedCounty, setSelectedCounty] = useState(null)
-  const [filters, setFilters] = useState({ reports: true, pending: true, verified: true })
+  const [filters, setFilters] = useState({ reports: true, pending: true, verified: true, trajectory: false })
   const [geoKey, setGeoKey] = useState(0)
 
   useEffect(() => {
@@ -453,6 +454,25 @@ export default function MapView({ reports = [], clusters = [], timeRange, setTim
           )
         })}
 
+        {verifiedClusters.map((c) => {
+          const coords = ZIP_COORDS[c.zip_code]
+          if (!coords) return null
+          if (c.risk_level === 'HIGH') {
+            return (
+              <span key={`ring-${c.cluster_id}`}>
+                <Circle center={coords} radius={4828} pathOptions={{ fillColor: '#f59e0b', fillOpacity: 0.04, weight: 0 }} interactive={false} />
+                <Circle center={coords} radius={1609} pathOptions={{ fillColor: '#dc2626', fillOpacity: 0.06, weight: 0 }} interactive={false} />
+              </span>
+            )
+          }
+          if (c.risk_level === 'MEDIUM') {
+            return (
+              <Circle key={`ring-${c.cluster_id}`} center={coords} radius={3219} pathOptions={{ fillColor: '#f59e0b', fillOpacity: 0.04, weight: 0 }} interactive={false} />
+            )
+          }
+          return null
+        })}
+
         {pendingClusters.map((c) => (
           <Marker
             key={`pc-${c.cluster_id}`}
@@ -504,6 +524,55 @@ export default function MapView({ reports = [], clusters = [], timeRange, setTim
             </Popup>
           </CircleMarker>
         ))}
+
+        {filters.trajectory && Object.values(trajectories).map((traj) => {
+          const points = traj.trajectory || []
+          if (points.length < 2) return null
+          const positions = points.map((p) => [p.lat, p.lng])
+          const last = positions[positions.length - 1]
+          const prev = positions[positions.length - 2]
+          const angle = Math.atan2(last[1] - prev[1], last[0] - prev[0]) * 180 / Math.PI
+          return (
+            <span key={`traj-${traj.cluster_id}`}>
+              <Polyline
+                positions={positions}
+                pathOptions={{ color: '#dc2626', weight: 2, dashArray: '6 4' }}
+              />
+              <Marker
+                position={last}
+                icon={L.divIcon({
+                  className: '',
+                  iconSize: [12, 12],
+                  iconAnchor: [6, 6],
+                  html: `<svg width="12" height="12" viewBox="0 0 12 12" style="transform:rotate(${90 - angle}deg)"><polygon points="6,0 12,12 0,12" fill="#dc2626"/></svg>`,
+                })}
+                interactive={false}
+              />
+            </span>
+          )
+        })}
+
+        {filters.trajectory && Object.values(trajectories).flatMap((traj) =>
+          (traj.adjacent_at_risk_zips || []).map((z) => {
+            const coords = ZIP_COORDS[z.zip]
+            if (!coords) return null
+            return (
+              <CircleMarker
+                key={`adj-${z.zip}`}
+                center={coords}
+                radius={12}
+                pathOptions={{
+                  fillColor: '#f59e0b',
+                  fillOpacity: 0.3,
+                  color: '#f59e0b',
+                  weight: 1,
+                }}
+              >
+                <Tooltip>{`${z.zip} — ${z.spread_likelihood} (${z.miles_from_centroid.toFixed(1)} mi)`}</Tooltip>
+              </CircleMarker>
+            )
+          })
+        )}
       </MapContainer>
 
       <MapControls

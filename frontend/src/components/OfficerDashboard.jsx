@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchClusters, verifyCluster, dismissCluster, fetchClusterReports } from '../api'
+import { fetchClusters, verifyCluster, dismissCluster, fetchClusterReports, fetchClusterTrajectory } from '../api'
 import { useLanguage } from '../i18n/LanguageContext'
 import DailyBriefing from './DailyBriefing'
 
@@ -145,7 +145,72 @@ function ClusterDetails({ cluster, reports }) {
   )
 }
 
-function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, reportsError, onToggleExpand }) {
+function TrajectoryWatchlist({ trajectory }) {
+  const { t } = useLanguage()
+  if (!trajectory) return null
+
+  const hasDrift = trajectory.drift_distance_miles > 0.1
+  const watchlist = trajectory.adjacent_at_risk_zips || []
+
+  const likelihoodBadge = {
+    HIGH: 'bg-red-100 text-red-700',
+    MEDIUM: 'bg-amber-100 text-amber-700',
+    LOW: 'bg-gray-100 text-gray-600',
+  }
+
+  return (
+    <div className="bg-slate-50 -mx-6 -mb-6 px-6 pb-6 pt-4 border-t border-gray-200 mt-2">
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+        {t('trajectory_title')}
+      </p>
+
+      <p className="text-sm text-gray-700 mb-3">
+        {hasDrift
+          ? t('trajectory_drift', {
+              direction: trajectory.drift_direction,
+              miles: trajectory.drift_distance_miles.toFixed(1),
+              hours: trajectory.drift_period_hours,
+            })
+          : t('trajectory_stable')}
+      </p>
+
+      {watchlist.length > 0 && (
+        <table className="w-full mb-3">
+          <thead>
+            <tr className="text-xs uppercase tracking-wide text-gray-500">
+              <th className="text-left py-2 font-medium">{t('col_zip')}</th>
+              <th className="text-left py-2 font-medium">{t('col_distance')}</th>
+              <th className="text-left py-2 font-medium">{t('col_overlap_reports')}</th>
+              <th className="text-left py-2 font-medium">{t('col_spread_likelihood')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {watchlist.map((z) => (
+              <tr key={z.zip} className="border-b border-gray-200">
+                <td className="py-2 text-xs text-gray-700">{z.zip}</td>
+                <td className="py-2 text-xs text-gray-600">{z.miles_from_centroid.toFixed(1)} mi</td>
+                <td className="py-2 text-xs text-gray-600">{z.recent_overlap_reports}</td>
+                <td className="py-2">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${likelihoodBadge[z.spread_likelihood]}`}>
+                    {z.spread_likelihood}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {watchlist.length === 0 && (
+        <p className="text-sm text-gray-400 mb-3">{t('trajectory_no_adjacent')}</p>
+      )}
+
+      <p className="text-xs text-gray-400 italic">{t('trajectory_caveat')}</p>
+    </div>
+  )
+}
+
+function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, reportsError, onToggleExpand, trajectory }) {
   const { t } = useLanguage()
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
@@ -262,6 +327,10 @@ function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, rep
       {expanded && reports && reports.length > 0 && (
         <ClusterDetails cluster={cluster} reports={reports} />
       )}
+
+      {expanded && trajectory && (
+        <TrajectoryWatchlist trajectory={trajectory} />
+      )}
     </div>
   )
 }
@@ -293,6 +362,7 @@ export default function OfficerDashboard({ onBack, clusterUpdate }) {
   const [tab, setTab] = useState('briefing')
   const [expandedClusterId, setExpandedClusterId] = useState(null)
   const [clusterReports, setClusterReports] = useState({})
+  const [clusterTrajectories, setClusterTrajectories] = useState({})
   const [loadingReports, setLoadingReports] = useState(null)
   const [reportsError, setReportsError] = useState(null)
 
@@ -323,17 +393,23 @@ export default function OfficerDashboard({ onBack, clusterUpdate }) {
     if (!clusterReports[clusterId]) {
       setLoadingReports(clusterId)
       try {
-        const data = await fetchClusterReports(clusterId)
-        if (data.error) {
-          setReportsError(data.error)
+        const reportsData = await fetchClusterReports(clusterId)
+        if (reportsData.error) {
+          setReportsError(reportsData.error)
         } else {
-          setClusterReports((prev) => ({ ...prev, [clusterId]: data.reports || [] }))
+          setClusterReports((prev) => ({ ...prev, [clusterId]: reportsData.reports || [] }))
         }
       } catch {
         setReportsError(t('error_load_reports'))
       } finally {
         setLoadingReports(null)
       }
+      try {
+        const trajData = await fetchClusterTrajectory(clusterId)
+        if (!trajData.error) {
+          setClusterTrajectories((prev) => ({ ...prev, [clusterId]: trajData }))
+        }
+      } catch { /* trajectory is optional */ }
     }
   }
 
@@ -402,6 +478,7 @@ export default function OfficerDashboard({ onBack, clusterUpdate }) {
             reportsLoading={loadingReports === c.cluster_id}
             reportsError={expandedClusterId === c.cluster_id ? reportsError : null}
             onToggleExpand={() => handleToggleExpand(c.cluster_id)}
+            trajectory={clusterTrajectories[c.cluster_id] || null}
           />
         ))}
       </div>

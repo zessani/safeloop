@@ -6,7 +6,7 @@ import ClusterAlertToast from './components/ClusterAlertToast'
 import ClusterList from './components/ClusterList'
 import OfficerDashboard from './components/OfficerDashboard'
 import { LanguageProvider, useLanguage } from './i18n/LanguageContext'
-import { fetchReports, fetchReportsList, fetchClusters, useWebSocket } from './api'
+import { fetchReports, fetchReportsList, fetchClusters, fetchClusterTrajectory, useWebSocket } from './api'
 
 function LanguageToggle() {
   const { lang, setLanguage } = useLanguage()
@@ -41,6 +41,7 @@ function AppInner() {
   const [clusterZips, setClusterZips] = useState(new Set())
   const [verifiedZips, setVerifiedZips] = useState(new Set())
   const [currentToast, setCurrentToast] = useState(null)
+  const [trajectories, setTrajectories] = useState({})
 
   const { clusterAlerts, lastClusterAlert, clusterUpdate } = useWebSocket()
 
@@ -62,6 +63,19 @@ function AppInner() {
     }
   }, [])
 
+  const loadTrajectories = useCallback(async (clusters) => {
+    const active = clusters.filter((c) => c.status === 'pending' || c.status === 'verified')
+    if (active.length === 0) { setTrajectories({}); return }
+    const results = {}
+    await Promise.all(active.map(async (c) => {
+      try {
+        const data = await fetchClusterTrajectory(c.cluster_id)
+        if (!data.error) results[c.cluster_id] = data
+      } catch { /* ignore */ }
+    }))
+    setTrajectories(results)
+  }, [])
+
   const loadClusterStatus = useCallback(async () => {
     try {
       const data = await fetchClusters()
@@ -75,10 +89,11 @@ function AppInner() {
       }
       setVerifiedZips(verified)
       setClusterZips(clustered)
+      loadTrajectories(all)
     } catch {
       // backend not reachable
     }
-  }, [])
+  }, [loadTrajectories])
 
   useEffect(() => {
     loadReports()
@@ -133,6 +148,7 @@ function AppInner() {
       <MapView
         reports={reportsList}
         clusters={clustersArray}
+        trajectories={trajectories}
         timeRange={timeRange}
         setTimeRange={handleTimeRange}
       />

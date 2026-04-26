@@ -44,6 +44,11 @@ export async function fetchClusterReports(id) {
   return res.json()
 }
 
+export async function fetchClusterTrajectory(id) {
+  const res = await fetch(`/api/clusters/${id}/trajectory`)
+  return res.json()
+}
+
 export async function dismissCluster(id, notes) {
   const res = await fetch(`/api/clusters/${id}/dismiss`, {
     method: 'POST',

@@ -165,7 +165,7 @@ function getFacilities(zip, showER) {
     ? ['ER', 'Telehealth', 'Urgent Care']
     : ['Telehealth', 'Urgent Care', 'ER']
 
-  return all.sort((a, b) => typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type))
+  return all.sort((a, b) => typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type)).slice(0, 3)
 }
 
 function occupationSentence(occupation, zipCode, county) {

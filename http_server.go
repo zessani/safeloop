@@ -124,6 +124,9 @@ func StartHTTPServer(port string, store *ReportStore, wc *WeatherCache, cs *Clus
 	mux.HandleFunc("GET /api/clusters/{id}/reports", func(w http.ResponseWriter, r *http.Request) {
 		handleClusterReports(w, r, store, cs)
 	})
+	mux.HandleFunc("GET /api/clusters/{id}/trajectory", func(w http.ResponseWriter, r *http.Request) {
+		handleClusterTrajectory(w, r, store, cs)
+	})
 	mux.HandleFunc("GET /api/officer/briefing", func(w http.ResponseWriter, r *http.Request) {
 		handleBriefing(w, r, store, cs)
 	})
@@ -644,4 +647,15 @@ func handleClusterReports(w http.ResponseWriter, r *http.Request, store *ReportS
 		"cluster_id": id,
 		"reports":    entries,
 	})
+}
+
+func handleClusterTrajectory(w http.ResponseWriter, r *http.Request, store *ReportStore, cs *ClusterStore) {
+	id := r.PathValue("id")
+	resp, err := computeTrajectory(id, store, cs)
+	if err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
