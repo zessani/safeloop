@@ -90,7 +90,7 @@ func handleClient(conn net.Conn, store *ReportStore, wc *WeatherCache) {
 		writeLine(rw, "Computing risk assessment...")
 		writeLine(rw, "")
 
-		level, score, weather, matched := ComputeRisk(symptoms, zip, travel, animal, wc, store)
+		profile, weather, matched := ComputeRisk(symptoms, zip, travel, animal, wc, store, ageBracket, occupation)
 
 		id := generateID()
 		report := Report{
@@ -100,8 +100,8 @@ func handleClient(conn net.Conn, store *ReportStore, wc *WeatherCache) {
 			TravelHistory: travel,
 			AnimalContact: animal,
 			Timestamp:     time.Now(),
-			RiskScore:     score,
-			RiskLevel:     level,
+			RiskScore:     profile.TotalScore,
+			RiskLevel:     profile.RiskLevel,
 			WeatherData:   weather,
 			MatchedAlerts: matched,
 			AgeBracket:    ageBracket,
@@ -110,9 +110,14 @@ func handleClient(conn net.Conn, store *ReportStore, wc *WeatherCache) {
 		store.AddReport(report)
 
 		writeLine(rw, "==================================")
-		writeLine(rw, fmt.Sprintf("  RISK LEVEL:  %s (score: %.2f)", level, score))
+		writeLine(rw, fmt.Sprintf("  RISK LEVEL:  %s (score: %.2f)", profile.RiskLevel, profile.TotalScore))
 		writeLine(rw, fmt.Sprintf("  Report ID:   %s", id))
 		writeLine(rw, fmt.Sprintf("  Weather:     %.1f°C, %d%% humidity, %s", weather.Temp, weather.Humidity, weather.Description))
+		writeLine(rw, "")
+		writeLine(rw, "  One Health Breakdown:")
+		writeBucket(rw, profile.Human)
+		writeBucket(rw, profile.Animal)
+		writeBucket(rw, profile.Environment)
 		if len(matched) > 0 {
 			writeLine(rw, "")
 			writeLine(rw, "  EpiCore Matches:")
@@ -269,6 +274,14 @@ func promptYesNo(rw *bufio.ReadWriter, question string) (bool, error) {
 		}
 		writeLine(rw, "Invalid input. Please enter y or n.")
 	}
+}
+
+func writeBucket(rw *bufio.ReadWriter, b SignalBucket) {
+	factors := ""
+	if len(b.Factors) > 0 {
+		factors = "  [" + strings.Join(b.Factors, ", ") + "]"
+	}
+	writeLine(rw, fmt.Sprintf("    %-12s %3d/100%s", b.Name+":", b.Score, factors))
 }
 
 func broadcastAlert(store *ReportStore, alert ClusterAlert) {

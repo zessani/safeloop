@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -186,4 +189,111 @@ func fetchPathogenAlerts() []PathogenAlert {
 			IssuedAt:      time.Now(),
 		},
 	}
+}
+
+type geminiRequest struct {
+	Contents []geminiContent `json:"contents"`
+}
+
+type geminiContent struct {
+	Parts []geminiPart `json:"parts"`
+}
+
+type geminiPart struct {
+	Text string `json:"text"`
+}
+
+type geminiResponse struct {
+	Candidates []struct {
+		Content struct {
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
+		} `json:"content"`
+	} `json:"candidates"`
+}
+
+func generateNarrative(profile RiskProfile, weather WeatherInfo, matched []EpiCoreAlert, zip, ageBracket, occupation string) string {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return narrativeFallback(profile, zip)
+	}
+
+	var factors []string
+	factors = append(factors, profile.Human.Factors...)
+	factors = append(factors, profile.Animal.Factors...)
+	factors = append(factors, profile.Environment.Factors...)
+
+	var alertDescs []string
+	for _, a := range matched {
+		alertDescs = append(alertDescs, fmt.Sprintf("%s in %s (%s severity)", a.Disease, a.Region, a.Severity))
+	}
+
+	prompt := fmt.Sprintf(
+		"You are a public health assistant. Given this health risk assessment, write a 2-3 sentence plain-English explanation for the user. Be clear and actionable.\n\n"+
+			"ZIP: %s\nAge: %s\nOccupation: %s\n"+
+			"Risk Level: %s (score: %.2f)\n"+
+			"Human Signal: %d/100\nAnimal Signal: %d/100\nEnvironment Signal: %d/100\n"+
+			"Factors: %s\n"+
+			"Weather: %.1f°C, %d%% humidity, %s\n"+
+			"Active Alerts: %s",
+		zip, ageBracket, occupation,
+		profile.RiskLevel, profile.TotalScore,
+		profile.Human.Score, profile.Animal.Score, profile.Environment.Score,
+		strings.Join(factors, "; "),
+		weather.Temp, weather.Humidity, weather.Description,
+		strings.Join(alertDescs, "; "),
+	)
+
+	reqBody := geminiRequest{
+		Contents: []geminiContent{
+			{Parts: []geminiPart{{Text: prompt}}},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return narrativeFallback(profile, zip)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s", apiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return narrativeFallback(profile, zip)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return narrativeFallback(profile, zip)
+	}
+	defer resp.Body.Close()
+
+	var gemResp geminiResponse
+	if err := json.NewDecoder(resp.Body).Decode(&gemResp); err != nil {
+		return narrativeFallback(profile, zip)
+	}
+
+	if len(gemResp.Candidates) > 0 && len(gemResp.Candidates[0].Content.Parts) > 0 {
+		return gemResp.Candidates[0].Content.Parts[0].Text
+	}
+
+	return narrativeFallback(profile, zip)
+}
+
+func narrativeFallback(profile RiskProfile, zip string) string {
+	primary := profile.Human
+	if profile.Animal.Score > primary.Score {
+		primary = profile.Animal
+	}
+	if profile.Environment.Score > primary.Score {
+		primary = profile.Environment
+	}
+	return fmt.Sprintf(
+		"Based on your reported symptoms in ZIP %s, your risk level is %s. %s Signal is the primary driver at %d/100. Monitor your symptoms and consult a healthcare provider if they worsen.",
+		zip, profile.RiskLevel, primary.Name, primary.Score,
+	)
 }

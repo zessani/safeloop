@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
+	"sort"
 	"sync"
 	"time"
 )
@@ -17,9 +18,9 @@ const (
 )
 
 type WeatherInfo struct {
-	Temp        float64
-	Humidity    int
-	Description string
+	Temp        float64 `json:"temp"`
+	Humidity    int     `json:"humidity"`
+	Description string  `json:"description"`
 }
 
 type CDCActivity struct {
@@ -50,32 +51,101 @@ type Report struct {
 	MatchedAlerts []EpiCoreAlert
 	AgeBracket    string
 	Occupation    string
+	Narrative     string
 }
 
 type EpiCoreAlert struct {
-	AlertID          string
-	Disease          string
-	Region           string
-	Country          string
-	TransmissionType string // "animal_origin", "vector_borne", "person_to_person", "environmental"
-	Severity         string // "LOW", "MEDIUM", "HIGH"
-	Symptoms         []string
-	ReportedAt       time.Time
+	AlertID          string    `json:"alert_id"`
+	Disease          string    `json:"disease"`
+	Region           string    `json:"region"`
+	Country          string    `json:"country"`
+	TransmissionType string    `json:"transmission_type"`
+	Severity         string    `json:"severity"`
+	Symptoms         []string  `json:"symptoms"`
+	ReportedAt       time.Time `json:"reported_at"`
+}
+
+type SignalBucket struct {
+	Name    string   `json:"name"`
+	Score   int      `json:"score"`
+	Factors []string `json:"factors"`
+}
+
+type RiskProfile struct {
+	Human       SignalBucket `json:"human"`
+	Animal      SignalBucket `json:"animal"`
+	Environment SignalBucket `json:"environment"`
+	TotalScore  float64      `json:"total_score"`
+	RiskLevel   RiskLevel    `json:"risk_level"`
 }
 
 type ClusterAlert struct {
-	ZipCode    string
-	Count      int
-	Symptoms   []string
-	RiskLevel  RiskLevel
-	DetectedAt time.Time
-	Message    string
+	ClusterID        string         `json:"cluster_id"`
+	ZipCode          string         `json:"zip_code"`
+	Count            int            `json:"count"`
+	Symptoms         []string       `json:"symptoms"`
+	DominantSymptoms []string       `json:"dominant_symptoms"`
+	RiskLevel        RiskLevel      `json:"risk_level"`
+	DetectedAt       time.Time      `json:"first_detected_at"`
+	Message          string         `json:"message"`
+	Status           string         `json:"status"`
+	VerifiedAt       *time.Time     `json:"verified_at"`
+	OfficerNotes     string         `json:"officer_notes"`
+	MatchedAlerts    []EpiCoreAlert `json:"matched_alerts"`
 }
 
 type ReportStore struct {
 	mu      sync.Mutex
 	reports []Report
 	clients []net.Conn
+}
+
+type ClusterStore struct {
+	mu       sync.Mutex
+	clusters map[string]*ClusterAlert
+}
+
+func NewClusterStore() *ClusterStore {
+	return &ClusterStore{
+		clusters: make(map[string]*ClusterAlert),
+	}
+}
+
+func (cs *ClusterStore) Add(alert *ClusterAlert) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.clusters[alert.ClusterID] = alert
+}
+
+func (cs *ClusterStore) Get(id string) (*ClusterAlert, bool) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	c, ok := cs.clusters[id]
+	return c, ok
+}
+
+func (cs *ClusterStore) GetAll() []*ClusterAlert {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	result := make([]*ClusterAlert, 0, len(cs.clusters))
+	for _, c := range cs.clusters {
+		result = append(result, c)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].DetectedAt.After(result[j].DetectedAt)
+	})
+	return result
+}
+
+func (cs *ClusterStore) Exists(zip string) bool {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	for _, c := range cs.clusters {
+		if c.ZipCode == zip && (c.Status == "pending" || c.Status == "verified") {
+			return true
+		}
+	}
+	return false
 }
 
 func NewReportStore() *ReportStore {
@@ -130,13 +200,45 @@ func (s *ReportStore) CheckCluster(zip string) (ClusterAlert, bool) {
 		return ClusterAlert{}, false
 	}
 
+	type symFreq struct {
+		name  string
+		count int
+	}
+	var freqs []symFreq
+	for sym, count := range symptomCount {
+		freqs = append(freqs, symFreq{sym, count})
+	}
+	sort.Slice(freqs, func(i, j int) bool { return freqs[i].count > freqs[j].count })
+	var topSymptoms []string
+	for i, f := range freqs {
+		if i >= 3 {
+			break
+		}
+		topSymptoms = append(topSymptoms, f.name)
+	}
+
+	seen := make(map[string]bool)
+	var clusterAlerts []EpiCoreAlert
+	for _, r := range recent {
+		for _, a := range r.MatchedAlerts {
+			if !seen[a.AlertID] {
+				seen[a.AlertID] = true
+				clusterAlerts = append(clusterAlerts, a)
+			}
+		}
+	}
+
 	alert := ClusterAlert{
-		ZipCode:    zip,
-		Count:      len(recent),
-		Symptoms:   dominant,
-		RiskLevel:  RiskHigh,
-		DetectedAt: time.Now(),
-		Message:    fmt.Sprintf("CLUSTER ALERT: %d overlapping cases in ZIP %s (%s) — Risk: HIGH", len(recent), zip, joinSymptoms(dominant)),
+		ClusterID:        generateID(),
+		ZipCode:          zip,
+		Count:            len(recent),
+		Symptoms:         dominant,
+		DominantSymptoms: topSymptoms,
+		RiskLevel:        RiskHigh,
+		DetectedAt:       time.Now(),
+		Message:          fmt.Sprintf("CLUSTER ALERT: %d overlapping cases in ZIP %s (%s) — Risk: HIGH", len(recent), zip, joinSymptoms(dominant)),
+		Status:           "pending",
+		MatchedAlerts:    clusterAlerts,
 	}
 	return alert, true
 }

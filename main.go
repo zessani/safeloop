@@ -13,11 +13,14 @@ func main() {
 
 	store := NewReportStore()
 	wc := NewWeatherCache()
+	cs := NewClusterStore()
 
 	fmt.Println("==========================================")
 	fmt.Println("  HealthPulse Surveillance System")
 	fmt.Println("  TCP server starting on :8080")
+	fmt.Println("  HTTP server starting on :8081")
 	fmt.Println("==========================================")
 
+	go StartHTTPServer(":8081", store, wc, cs)
 	StartTCPServer(":8080", store, wc)
 }
