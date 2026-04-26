@@ -230,7 +230,7 @@ func generateNarrative(profile RiskProfile, weather WeatherInfo, matched []EpiCo
 	}
 
 	prompt := fmt.Sprintf(
-		"You are a public health assistant. Given this health risk assessment, write a 2-3 sentence plain-English explanation for the user. Be clear and actionable.\n\n"+
+		"You are a public health assistant. Given this health risk assessment, write a 2-3 sentence plain-English explanation for the user. Be clear and actionable. Respond in plain prose only. Do not use markdown formatting, asterisks, bullet points, headers, or any special syntax.\n\n"+
 			"ZIP: %s\nAge: %s\nOccupation: %s\n"+
 			"Risk Level: %s (score: %.2f)\n"+
 			"Human Signal: %d/100\nAnimal Signal: %d/100\nEnvironment Signal: %d/100\n"+

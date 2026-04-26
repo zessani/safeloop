@@ -11,6 +11,7 @@ export default function App() {
   const [view, setView] = useState('map')
   const [reportData, setReportData] = useState(null)
   const [result, setResult] = useState(null)
+  const [formData, setFormData] = useState(null)
   const [showForm, setShowForm] = useState(true)
   const [clusterZips, setClusterZips] = useState(new Set())
   const [verifiedZips, setVerifiedZips] = useState(new Set())
@@ -59,8 +60,9 @@ export default function App() {
     }
   }, [lastClusterAlert])
 
-  function handleResult(data) {
+  function handleResult(data, form) {
     setResult(data)
+    setFormData(form)
     setShowForm(false)
     loadReports()
     loadClusterStatus()
@@ -104,7 +106,7 @@ export default function App() {
       {showForm ? (
         <SymptomForm onResult={handleResult} />
       ) : (
-        <RiskProfile result={result} onReset={handleReset} />
+        <RiskProfile result={result} formData={formData} onReset={handleReset} />
       )}
 
       <ClusterAlertToast

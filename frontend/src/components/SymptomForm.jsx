@@ -67,7 +67,7 @@ export default function SymptomForm({ onResult }) {
         travel_history: travel,
         animal_contact: animal,
       })
-      onResult(result)
+      onResult(result, { symptoms, occupation, zipCode, animal, travel })
     } catch {
       setError('Failed to submit. Is the backend running?')
     } finally {
