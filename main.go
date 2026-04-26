@@ -31,7 +31,7 @@ func main() {
 	}
 
 	fmt.Println("==========================================")
-	fmt.Println("  HealthPulse Surveillance System")
+	fmt.Println("  SafeLoop Surveillance System")
 	fmt.Println("  TCP server starting on :8080")
 	fmt.Println("  HTTP server starting on :8081")
 	fmt.Println("==========================================")

@@ -29,6 +29,11 @@ export async function verifyCluster(id, notes) {
   return res.json()
 }
 
+export async function fetchReportsList(range = '7d') {
+  const res = await fetch(`/api/reports/list?range=${range}`)
+  return res.json()
+}
+
 export async function fetchBriefing() {
   const res = await fetch('/api/officer/briefing')
   return res.json()

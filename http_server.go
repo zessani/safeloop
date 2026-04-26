@@ -118,6 +118,9 @@ func StartHTTPServer(port string, store *ReportStore, wc *WeatherCache, cs *Clus
 	mux.HandleFunc("POST /api/clusters/{id}/dismiss", func(w http.ResponseWriter, r *http.Request) {
 		handleClusterAction(w, r, cs, hub, "dismissed")
 	})
+	mux.HandleFunc("GET /api/reports/list", func(w http.ResponseWriter, r *http.Request) {
+		handleListReports(w, r, store)
+	})
 	mux.HandleFunc("GET /api/clusters/{id}/reports", func(w http.ResponseWriter, r *http.Request) {
 		handleClusterReports(w, r, store, cs)
 	})
@@ -268,6 +271,49 @@ func handleGetReports(w http.ResponseWriter, r *http.Request, store *ReportStore
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+type mapReportEntry struct {
+	ID        string   `json:"id"`
+	ZipCode   string   `json:"zip_code"`
+	Symptoms  []string `json:"symptoms"`
+	RiskLevel string   `json:"risk_level"`
+	Timestamp string   `json:"timestamp"`
+}
+
+func handleListReports(w http.ResponseWriter, r *http.Request, store *ReportStore) {
+	rangeParam := r.URL.Query().Get("range")
+	var window time.Duration
+	switch rangeParam {
+	case "24h":
+		window = 24 * time.Hour
+	case "30d":
+		window = 30 * 24 * time.Hour
+	default:
+		window = 7 * 24 * time.Hour
+	}
+
+	cutoff := time.Now().Add(-window)
+
+	store.mu.Lock()
+	var entries []mapReportEntry
+	for _, rep := range store.reports {
+		if rep.Timestamp.After(cutoff) {
+			entries = append(entries, mapReportEntry{
+				ID:        rep.ID,
+				ZipCode:   rep.ZipCode,
+				Symptoms:  rep.Symptoms,
+				RiskLevel: string(rep.RiskLevel),
+				Timestamp: rep.Timestamp.Format(time.RFC3339),
+			})
+		}
+	}
+	store.mu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"reports": entries,
+	})
 }
 
 func handleGetClusters(w http.ResponseWriter, r *http.Request, store *ReportStore, cs *ClusterStore) {

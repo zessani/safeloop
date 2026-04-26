@@ -1,4 +1,4 @@
-healthpulse
+safeloop
 frontend/node_modules/
 frontend/dist/
 data/*.json

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchClusters, verifyCluster, dismissCluster, fetchClusterReports } from '../api'
+import { useLanguage } from '../i18n/LanguageContext'
 import DailyBriefing from './DailyBriefing'
 
 const SEVERITY_DOTS = {
@@ -65,6 +66,7 @@ function Chevron({ expanded }) {
 }
 
 function ClusterDetails({ cluster, reports }) {
+  const { t } = useLanguage()
   const symptomCounts = {}
   for (const r of reports) {
     for (const s of r.symptoms) {
@@ -77,29 +79,29 @@ function ClusterDetails({ cluster, reports }) {
       .map(([sym]) => sym)
   )
 
-  const sharedList = [...sharedSymptoms].map((s) => s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' '))
+  const sharedList = [...sharedSymptoms].map((s) => t('symptom_' + s))
 
   return (
     <div className="bg-slate-50 -mx-6 -mb-6 px-6 pb-6 pt-4 border-t border-gray-200 mt-4">
       <p className="text-xs text-gray-500 mb-3">
-        These reports were grouped because they share zip {cluster.zip_code} and at least 2 overlapping symptoms within a 24-hour window.
+        {t('cluster_explanation', { zip: cluster.zip_code })}
       </p>
 
       {sharedList.length > 0 && (
         <p className="text-sm text-gray-700 mb-4">
-          Shared symptoms across cluster: {sharedList.join(', ')}
+          {t('shared_symptoms')} {sharedList.join(', ')}
         </p>
       )}
 
       <table className="w-full">
         <thead>
           <tr className="text-xs uppercase tracking-wide text-gray-500">
-            <th className="text-left py-2 font-medium">Submitted</th>
-            <th className="text-left py-2 font-medium">Age</th>
-            <th className="text-left py-2 font-medium">Occupation</th>
-            <th className="text-left py-2 font-medium">Symptoms</th>
-            <th className="text-left py-2 font-medium">Indicators</th>
-            <th className="text-left py-2 font-medium">Risk</th>
+            <th className="text-left py-2 font-medium">{t('col_submitted')}</th>
+            <th className="text-left py-2 font-medium">{t('col_age')}</th>
+            <th className="text-left py-2 font-medium">{t('col_occupation')}</th>
+            <th className="text-left py-2 font-medium">{t('col_symptoms')}</th>
+            <th className="text-left py-2 font-medium">{t('col_indicators')}</th>
+            <th className="text-left py-2 font-medium">{t('col_risk')}</th>
           </tr>
         </thead>
         <tbody>
@@ -119,15 +121,15 @@ function ClusterDetails({ cluster, reports }) {
                           : 'bg-gray-100 text-gray-600'
                       }`}
                     >
-                      {s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')}
+                      {t('symptom_' + s)}
                     </span>
                   ))}
                 </div>
               </td>
               <td className="py-2 text-xs text-gray-600 align-top">
                 <div className="flex gap-2">
-                  {r.travel_history && <span>✈ Travel</span>}
-                  {r.animal_contact && <span>🐾 Animal</span>}
+                  {r.travel_history && <span>✈ {t('indicator_travel')}</span>}
+                  {r.animal_contact && <span>🐾 {t('indicator_animal')}</span>}
                 </div>
               </td>
               <td className="py-2 align-top">
@@ -144,6 +146,7 @@ function ClusterDetails({ cluster, reports }) {
 }
 
 function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, reportsError, onToggleExpand }) {
+  const { t } = useLanguage()
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -168,8 +171,8 @@ function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, rep
         onClick={onToggleExpand}
       >
         <div className="flex items-center gap-3">
-          <span className="text-lg font-semibold text-gray-900">ZIP {cluster.zip_code}</span>
-          <span className="text-sm text-gray-400">{cluster.count} cases</span>
+          <span className="text-lg font-semibold text-gray-900">{t('cluster_zip')} {cluster.zip_code}</span>
+          <span className="text-sm text-gray-400">{t('cluster_cases', { count: cluster.count })}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_BADGE[cluster.status]}`}>
@@ -181,17 +184,17 @@ function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, rep
 
       {cluster.dominant_symptoms && cluster.dominant_symptoms.length > 0 && (
         <p className="text-sm text-gray-500 mb-2">
-          Dominant symptoms: {cluster.dominant_symptoms.join(', ')}
+          {t('dominant_symptoms')} {cluster.dominant_symptoms.join(', ')}
         </p>
       )}
 
       <p className="text-xs text-gray-400 mb-4">
-        First detected {timeAgo(cluster.first_detected_at)}
+        {t('first_detected')} {timeAgo(cluster.first_detected_at)}
       </p>
 
       {cluster.matched_alerts && cluster.matched_alerts.length > 0 && (
         <div className="mb-4">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Matched global alerts</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{t('matched_global_alerts')}</p>
           <div className="flex flex-col gap-1.5">
             {cluster.matched_alerts.map((alert, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -209,7 +212,7 @@ function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, rep
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add notes about your verification decision..."
+            placeholder={t('notes_placeholder')}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-teal-600 resize-none h-20 mb-3"
           />
           <div className="flex gap-3">
@@ -218,14 +221,14 @@ function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, rep
               disabled={loading}
               className="flex-1 bg-teal-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 cursor-pointer"
             >
-              Verify and notify community
+              {t('verify_and_notify')}
             </button>
             <button
               onClick={() => handleAction('dismiss')}
               disabled={loading}
               className="flex-1 bg-white border border-gray-200 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
             >
-              Dismiss as noise
+              {t('dismiss_as_noise')}
             </button>
           </div>
         </div>
@@ -239,14 +242,14 @@ function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, rep
             </div>
           )}
           {cluster.verified_at && (
-            <p className="text-xs text-gray-400">Decided {timeAgo(cluster.verified_at)}</p>
+            <p className="text-xs text-gray-400">{t('decided')} {timeAgo(cluster.verified_at)}</p>
           )}
         </div>
       )}
 
       {expanded && reportsLoading && (
         <div className="bg-slate-50 -mx-6 -mb-6 px-6 pb-6 pt-4 border-t border-gray-200 mt-4">
-          <p className="text-sm text-gray-400 animate-pulse">Loading reports...</p>
+          <p className="text-sm text-gray-400 animate-pulse">{t('loading_reports')}</p>
         </div>
       )}
 
@@ -263,7 +266,29 @@ function ClusterCard({ cluster, onAction, expanded, reports, reportsLoading, rep
   )
 }
 
+function OfficerLanguageToggle() {
+  const { lang, setLanguage } = useLanguage()
+  return (
+    <div className="flex gap-1">
+      {['en', 'es'].map((l) => (
+        <button
+          key={l}
+          onClick={() => setLanguage(l)}
+          className={`px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer ${
+            lang === l
+              ? 'bg-teal-600 text-white'
+              : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function OfficerDashboard({ onBack, clusterUpdate }) {
+  const { t } = useLanguage()
   const [clusters, setClusters] = useState([])
   const [tab, setTab] = useState('briefing')
   const [expandedClusterId, setExpandedClusterId] = useState(null)
@@ -305,7 +330,7 @@ export default function OfficerDashboard({ onBack, clusterUpdate }) {
           setClusterReports((prev) => ({ ...prev, [clusterId]: data.reports || [] }))
         }
       } catch {
-        setReportsError('Could not load report details')
+        setReportsError(t('error_load_reports'))
       } finally {
         setLoadingReports(null)
       }
@@ -320,40 +345,43 @@ export default function OfficerDashboard({ onBack, clusterUpdate }) {
   }
 
   const tabs = [
-    { key: 'briefing', label: 'Daily Briefing' },
-    { key: 'pending', label: 'Pending' },
-    { key: 'verified', label: 'Verified' },
-    { key: 'dismissed', label: 'Dismissed' },
+    { key: 'briefing', label: t('tab_daily_briefing') },
+    { key: 'pending', label: t('tab_pending') },
+    { key: 'verified', label: t('tab_verified') },
+    { key: 'dismissed', label: t('tab_dismissed') },
   ]
 
   return (
     <div className="min-h-screen bg-slate-50 overflow-y-auto fixed inset-0 z-[2000]">
       <div className="bg-white shadow-sm px-8 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Public Health Officer Dashboard</h1>
-          <p className="text-xs text-gray-400">(Mock — not real authentication)</p>
+          <h1 className="text-xl font-semibold text-gray-900">{t('officer_dashboard_title')}</h1>
+          <p className="text-xs text-gray-400">{t('mock_auth_note')}</p>
         </div>
-        <button
-          onClick={onBack}
-          className="text-sm text-teal-600 hover:text-teal-700 transition-colors cursor-pointer"
-        >
-          &larr; Back to map
-        </button>
+        <div className="flex items-center gap-4">
+          <OfficerLanguageToggle />
+          <button
+            onClick={onBack}
+            className="text-sm text-teal-600 hover:text-teal-700 transition-colors cursor-pointer"
+          >
+            &larr; {t('back_to_map')}
+          </button>
+        </div>
       </div>
 
       <div className="px-8 pt-6 border-b border-gray-200 bg-white">
         <div className="flex gap-6 max-w-3xl mx-auto">
-          {tabs.map((t) => (
+          {tabs.map((tb) => (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+              key={tb.key}
+              onClick={() => setTab(tb.key)}
               className={`pb-3 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-                tab === t.key
+                tab === tb.key
                   ? 'border-teal-600 text-teal-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t.label}{t.key !== 'briefing' ? ` (${counts[t.key]})` : ''}
+              {tb.label}{tb.key !== 'briefing' ? ` (${counts[tb.key]})` : ''}
             </button>
           ))}
         </div>
@@ -362,7 +390,7 @@ export default function OfficerDashboard({ onBack, clusterUpdate }) {
       <div className={`${tab === 'briefing' ? 'max-w-5xl' : 'max-w-3xl'} mx-auto px-8 py-6`}>
         {tab === 'briefing' && <DailyBriefing />}
         {tab !== 'briefing' && filtered.length === 0 && (
-          <p className="text-sm text-gray-400 text-center py-12">No {tab} clusters</p>
+          <p className="text-sm text-gray-400 text-center py-12">{t('no_clusters', { tab })}</p>
         )}
         {tab !== 'briefing' && filtered.map((c) => (
           <ClusterCard

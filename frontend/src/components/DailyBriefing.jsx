@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchBriefing } from '../api'
+import { useLanguage } from '../i18n/LanguageContext'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -23,6 +24,7 @@ function SeverityDot({ severity }) {
 }
 
 export default function DailyBriefing() {
+  const { t } = useLanguage()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [secondsAgo, setSecondsAgo] = useState(0)
@@ -54,14 +56,14 @@ export default function DailyBriefing() {
   }, [])
 
   if (loading && !data) {
-    return <p className="text-sm text-gray-400 text-center py-16">Loading briefing...</p>
+    return <p className="text-sm text-gray-400 text-center py-16">{t('loading_briefing')}</p>
   }
 
   if (!data) {
-    return <p className="text-sm text-gray-400 text-center py-16">Unable to load briefing</p>
+    return <p className="text-sm text-gray-400 text-center py-16">{t('error_load_briefing')}</p>
   }
 
-  const updatedText = secondsAgo < 5 ? 'just now' : `${secondsAgo}s ago`
+  const updatedText = secondsAgo < 5 ? t('updated_just_now') : t('updated_seconds', { count: secondsAgo })
 
   const reportsPerDay = (data.reports_per_day || []).map((d) => ({
     date: d.date.slice(5),
@@ -85,15 +87,15 @@ export default function DailyBriefing() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Daily Briefing</h2>
-          <p className="text-xs text-gray-400">Updated {updatedText}</p>
+          <h2 className="text-lg font-semibold text-gray-900">{t('daily_briefing')}</h2>
+          <p className="text-xs text-gray-400">{updatedText}</p>
         </div>
         <button
           onClick={load}
           disabled={loading}
           className="text-sm text-teal-600 hover:text-teal-700 transition-colors disabled:opacity-50 cursor-pointer"
         >
-          Regenerate
+          {t('regenerate')}
         </button>
       </div>
 
@@ -104,15 +106,15 @@ export default function DailyBriefing() {
       )}
 
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <StatCard label="Reports today" value={data.stats?.reports_today ?? 0} />
-        <StatCard label="Reports this week" value={data.stats?.reports_7d ?? 0} />
-        <StatCard label="Pending review" value={data.stats?.active_pending_clusters ?? 0} accent="text-amber-700" />
-        <StatCard label="Verified outbreaks" value={data.stats?.active_verified_clusters ?? 0} accent="text-green-700" />
+        <StatCard label={t('reports_today')} value={data.stats?.reports_today ?? 0} />
+        <StatCard label={t('reports_this_week')} value={data.stats?.reports_7d ?? 0} />
+        <StatCard label={t('pending_review')} value={data.stats?.active_pending_clusters ?? 0} accent="text-amber-700" />
+        <StatCard label={t('verified_outbreaks')} value={data.stats?.active_verified_clusters ?? 0} accent="text-green-700" />
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-700 mb-4">Reports per day (7d)</p>
+          <p className="text-sm font-medium text-gray-700 mb-4">{t('chart_reports_per_day')}</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={reportsPerDay}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -125,7 +127,7 @@ export default function DailyBriefing() {
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-700 mb-4">Symptom frequency (7d)</p>
+          <p className="text-sm font-medium text-gray-700 mb-4">{t('chart_symptom_frequency')}</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={symptomData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -140,7 +142,7 @@ export default function DailyBriefing() {
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-700 mb-4">Risk distribution (7d)</p>
+          <p className="text-sm font-medium text-gray-700 mb-4">{t('chart_risk_distribution')}</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
@@ -159,23 +161,23 @@ export default function DailyBriefing() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
-          <p className="text-center text-xs text-gray-400 mt-1">{riskTotal} total assessments</p>
+          <p className="text-center text-xs text-gray-400 mt-1">{t('total_assessments', { count: riskTotal })}</p>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-700 mb-4">Top ZIP codes (7d)</p>
+          <p className="text-sm font-medium text-gray-700 mb-4">{t('chart_top_zips')}</p>
           <div className="flex flex-col gap-3">
             {(data.top_zips || []).map((z) => (
               <div key={z.zip} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-gray-900">{z.zip}</span>
-                  <span className="text-xs text-gray-400">{z.count} reports</span>
+                  <span className="text-xs text-gray-400">{t('reports_label', { count: z.count })}</span>
                 </div>
                 <SeverityDot severity={z.highest_risk} />
               </div>
             ))}
             {(!data.top_zips || data.top_zips.length === 0) && (
-              <p className="text-sm text-gray-400">No data yet</p>
+              <p className="text-sm text-gray-400">{t('no_data')}</p>
             )}
           </div>
         </div>
@@ -183,7 +185,7 @@ export default function DailyBriefing() {
 
       {data.recent_global_alerts && data.recent_global_alerts.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-700 mb-4">Global outbreak alerts</p>
+          <p className="text-sm font-medium text-gray-700 mb-4">{t('global_alerts_title')}</p>
           <div className="flex flex-col gap-2">
             {data.recent_global_alerts.map((a, i) => (
               <div key={i} className="flex items-center gap-3 text-sm">
